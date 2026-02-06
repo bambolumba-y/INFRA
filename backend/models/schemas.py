@@ -1,6 +1,6 @@
 """Database models defined with SQLModel (Pydantic v2 + SQLAlchemy)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -15,7 +15,7 @@ class User(SQLModel, table=True):
     preferences: dict | None = Field(default=None, sa_type_kwargs={"astext_type": None})
     sub_tier: str = Field(default="free")
     balance: float = Field(default=0.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Content(SQLModel, table=True):
@@ -29,7 +29,7 @@ class Content(SQLModel, table=True):
     summary: str | None = None
     vector_id: str | None = None
     sentiment_score: float | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class UserResume(SQLModel, table=True):
@@ -41,7 +41,7 @@ class UserResume(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id")
     extracted_data: dict | None = None
     s3_path: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Job(SQLModel, table=True):
@@ -55,4 +55,4 @@ class Job(SQLModel, table=True):
     salary_min: float | None = None
     salary_max: float | None = None
     requirements_vector: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
