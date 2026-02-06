@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type TabType = "news" | "jobs" | "profile";
 
@@ -13,13 +14,25 @@ interface AppState {
   setTelegramUser: (user: { id: number; firstName: string } | null) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  activeTab: "news",
-  setActiveTab: (tab) => set({ activeTab: tab }),
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      activeTab: "news",
+      setActiveTab: (tab) => set({ activeTab: tab }),
 
-  sourceFilter: null,
-  setSourceFilter: (source) => set({ sourceFilter: source }),
+      sourceFilter: null,
+      setSourceFilter: (source) => set({ sourceFilter: source }),
 
-  telegramUser: null,
-  setTelegramUser: (user) => set({ telegramUser: user }),
-}));
+      telegramUser: null,
+      setTelegramUser: (user) => set({ telegramUser: user }),
+    }),
+    {
+      name: "infra-app-store",
+      partialize: (state) => ({
+        activeTab: state.activeTab,
+        sourceFilter: state.sourceFilter,
+        telegramUser: state.telegramUser,
+      }),
+    },
+  ),
+);

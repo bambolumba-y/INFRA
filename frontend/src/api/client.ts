@@ -71,3 +71,57 @@ export async function saveApiKeys(keys: {
   const { data } = await api.post<{ status: string }>("/settings/keys", keys);
   return data;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Admin API                                                          */
+/* ------------------------------------------------------------------ */
+
+export interface ScrapingSource {
+  id: number;
+  source_type: string;
+  name: string;
+  enabled: boolean;
+  interval_minutes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminHealth {
+  scheduler_running: boolean;
+  jobs: { id: string; name: string; next_run: string | null }[];
+}
+
+export async function fetchSources(): Promise<ScrapingSource[]> {
+  const { data } = await api.get<ScrapingSource[]>("/admin/sources");
+  return data;
+}
+
+export async function createSource(source: {
+  source_type: string;
+  name: string;
+  enabled?: boolean;
+  interval_minutes?: number;
+}): Promise<ScrapingSource> {
+  const { data } = await api.post<ScrapingSource>("/admin/sources", source);
+  return data;
+}
+
+export async function updateSource(
+  id: number,
+  updates: { enabled?: boolean; interval_minutes?: number },
+): Promise<ScrapingSource> {
+  const { data } = await api.patch<ScrapingSource>(
+    `/admin/sources/${id}`,
+    updates,
+  );
+  return data;
+}
+
+export async function deleteSource(id: number): Promise<void> {
+  await api.delete(`/admin/sources/${id}`);
+}
+
+export async function fetchAdminHealth(): Promise<AdminHealth> {
+  const { data } = await api.get<AdminHealth>("/admin/health");
+  return data;
+}
