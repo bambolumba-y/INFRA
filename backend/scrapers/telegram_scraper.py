@@ -1,11 +1,12 @@
-"""Telegram channel scraper using Telethon (async)."""
+"""Telegram channel scraper using Telethon User Session (StringSession)."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
 
-from telethon import TelegramClient
+from telethon import TelegramClient, functions
+from telethon.sessions import StringSession
 from telethon.tl.types import Message
 
 from backend.core.config import settings
@@ -26,27 +27,38 @@ class TelegramPost:
 
 
 class TelegramScraper:
-    """Async service that monitors Telegram channels via Telethon."""
+    """Async service that monitors Telegram channels via Telethon User Session."""
 
     def __init__(
         self,
         api_id: int | None = None,
         api_hash: str | None = None,
-        session_name: str = "infra_scraper",
+        session_string: str | None = None,
     ) -> None:
         self.api_id = api_id or settings.telegram_api_id
         self.api_hash = api_hash or settings.telegram_api_hash
-        self.session_name = session_name
+        self.session_string = session_string or settings.telegram_session_string
         self._client: TelegramClient | None = None
 
     async def _get_client(self) -> TelegramClient:
-        """Return (and lazily start) the Telethon client."""
+        """Return (and lazily start) the Telethon client using StringSession."""
         if self._client is None:
-            self._client = TelegramClient(
-                self.session_name, self.api_id, self.api_hash
-            )
-            await self._client.start(bot_token=settings.telegram_bot_token)
+            session = StringSession(self.session_string)
+            self._client = TelegramClient(session, self.api_id, self.api_hash)
+            await self._client.start()
         return self._client
+
+    async def join_channel(self, channel: str) -> bool:
+        """Join a public channel if not already a member."""
+        client = await self._get_client()
+        try:
+            entity = await client.get_entity(channel)
+            await client(functions.channels.JoinChannelRequest(entity))
+            logger.info("Joined channel %s", channel)
+            return True
+        except Exception:
+            logger.exception("Failed to join channel %s", channel)
+            return False
 
     async def scrape_channel(
         self, channel: str, limit: int = 50
@@ -55,17 +67,32 @@ class TelegramScraper:
         client = await self._get_client()
         posts: list[TelegramPost] = []
 
-        async for message in client.iter_messages(channel, limit=limit):
-            if not isinstance(message, Message) or not message.text:
-                continue
+        try:
+            async for message in client.iter_messages(channel, limit=limit):
+                if not isinstance(message, Message) or not message.text:
+                    continue
 
-            post = TelegramPost(
-                channel=channel,
-                text=message.text,
-                message_id=message.id,
-                date=message.date.isoformat() if message.date else "",
-            )
-            posts.append(post)
+                post = TelegramPost(
+                    channel=channel,
+                    text=message.text,
+                    message_id=message.id,
+                    date=message.date.isoformat() if message.date else "",
+                )
+                posts.append(post)
+        except Exception:
+            logger.warning("Cannot read %s, attempting to join...", channel)
+            joined = await self.join_channel(channel)
+            if joined:
+                async for message in client.iter_messages(channel, limit=limit):
+                    if not isinstance(message, Message) or not message.text:
+                        continue
+                    post = TelegramPost(
+                        channel=channel,
+                        text=message.text,
+                        message_id=message.id,
+                        date=message.date.isoformat() if message.date else "",
+                    )
+                    posts.append(post)
 
         logger.info("Scraped %d messages from %s", len(posts), channel)
         return posts

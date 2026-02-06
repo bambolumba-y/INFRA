@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     telegram_api_id: int = 0
     telegram_api_hash: str = ""
     telegram_channels: str = ""  # comma-separated list of channels
+    telegram_session_string: str = ""  # Telethon StringSession
+    telegram_phone: str = ""  # phone number for user session login
 
     # Reddit
     reddit_client_id: str = ""
@@ -35,6 +37,8 @@ class Settings(BaseSettings):
 
     # ChromaDB
     chroma_persist_dir: str = "./chroma_data"
+    chroma_host: str = "localhost"
+    chroma_port: int = 8100
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

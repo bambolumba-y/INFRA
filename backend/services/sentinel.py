@@ -27,11 +27,9 @@ class SentinelService:
     """De-duplicate content via vector similarity and score news credibility."""
 
     def __init__(self, collection_name: str = "content_vectors") -> None:
-        self._chroma_client = chromadb.Client(
-            chromadb.Settings(
-                persist_directory=settings.chroma_persist_dir,
-                anonymized_telemetry=False,
-            )
+        self._chroma_client = chromadb.HttpClient(
+            host=settings.chroma_host,
+            port=settings.chroma_port,
         )
         self._collection = self._chroma_client.get_or_create_collection(
             name=collection_name,
