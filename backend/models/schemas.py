@@ -62,3 +62,17 @@ class Job(SQLModel, table=True):
     url: str | None = None
     source: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ScrapingSource(SQLModel, table=True):
+    """Configurable scraping source stored in the database."""
+
+    __tablename__ = "scraping_sources"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    source_type: str = Field(index=True)  # telegram, reddit, rss
+    name: str  # channel/subreddit/feed name
+    enabled: bool = Field(default=True)
+    interval_minutes: int = Field(default=15)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

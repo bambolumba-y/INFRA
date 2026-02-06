@@ -9,17 +9,40 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  vector-db:
+    image: chromadb/chroma:latest
+    ports:
+      - "8100:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
 
   backend:
     build:
       context: ./backend
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: >
+      sh -c "cd /app && python -m alembic upgrade head &&
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://infra:infra@db:5432/infra
+      CHROMA_HOST: vector-db
+      CHROMA_PORT: 8000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      vector-db:
+        condition: service_started
 
   frontend:
     build:
@@ -31,3 +54,4 @@ services:
 
 volumes:
   pgdata:
+  chromadata:

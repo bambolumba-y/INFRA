@@ -6,19 +6,26 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.admin import admin_router
 from backend.api.routes import router
 from backend.core.config import settings
 from backend.core.database import init_db
+from backend.services.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Run database init on startup."""
+    """Run database init and scheduler on startup."""
     try:
         await init_db()
     except Exception:
         pass  # DB may not be available in dev/test without Postgres
+    try:
+        start_scheduler()
+    except Exception:
+        pass  # Scheduler may fail in test environments
     yield
+    stop_scheduler()
 
 
 def create_app() -> FastAPI:
@@ -39,6 +46,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(router, prefix="/api")
+    app.include_router(admin_router, prefix="/api")
 
     return app
 
