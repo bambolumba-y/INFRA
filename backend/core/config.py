@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     anthropic_model: str = "claude-sonnet-4-20250514"
 
+    # Admin
+    admin_ids: list[int] = []  # Telegram user IDs allowed to access /admin
+
     # Telegram
     telegram_bot_token: str = ""
     telegram_api_id: int = 0

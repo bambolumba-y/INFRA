@@ -10,11 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.auth import require_tma_auth
+from backend.core.config import settings
 from backend.core.database import get_session
 from backend.models.schemas import ScrapingSource
 from backend.services.scheduler import scheduler
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+async def require_admin(user: dict = Depends(require_tma_auth)) -> dict:
+    """Verify authenticated user is in the ADMIN_IDS list."""
+    if settings.admin_ids and user.get("id") not in settings.admin_ids:
+        raise HTTPException(status_code=403, detail="Admin access denied")
+    return user
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +60,7 @@ class SourceResponse(BaseModel):
 @admin_router.get("/sources", response_model=list[SourceResponse])
 async def list_sources(
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_tma_auth),
+    _user: dict = Depends(require_admin),
 ) -> list[SourceResponse]:
     """List all configured scraping sources."""
     result = await session.execute(
@@ -77,7 +85,7 @@ async def list_sources(
 async def create_source(
     payload: SourceCreate,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_tma_auth),
+    _user: dict = Depends(require_admin),
 ) -> SourceResponse:
     """Add a new scraping source."""
     if payload.source_type not in ("telegram", "reddit", "rss"):
@@ -108,7 +116,7 @@ async def update_source(
     source_id: int,
     payload: SourceUpdate,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_tma_auth),
+    _user: dict = Depends(require_admin),
 ) -> SourceResponse:
     """Update an existing scraping source."""
     result = await session.execute(
@@ -141,7 +149,7 @@ async def update_source(
 async def delete_source(
     source_id: int,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_tma_auth),
+    _user: dict = Depends(require_admin),
 ) -> None:
     """Remove a scraping source."""
     result = await session.execute(
@@ -162,7 +170,7 @@ async def delete_source(
 
 @admin_router.get("/health")
 async def admin_health(
-    _user: dict = Depends(require_tma_auth),
+    _user: dict = Depends(require_admin),
 ) -> dict:
     """Return system health and scheduler status."""
     jobs = []

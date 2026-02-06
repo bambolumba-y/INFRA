@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import random
 from dataclasses import dataclass, field
 
 from telethon import TelegramClient, functions
@@ -105,7 +107,11 @@ class TelegramScraper:
             if ch.strip()
         ]
         all_posts: list[TelegramPost] = []
-        for channel in channels:
+        for i, channel in enumerate(channels):
+            if i > 0:
+                delay = random.uniform(2, 5)
+                logger.debug("Rate-limit delay: %.1fs before scraping %s", delay, channel)
+                await asyncio.sleep(delay)
             try:
                 posts = await self.scrape_channel(channel, limit=limit_per_channel)
                 all_posts.extend(posts)
