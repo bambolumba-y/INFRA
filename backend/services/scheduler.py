@@ -21,7 +21,7 @@ async def _get_sources() -> list[ScrapingSource]:
     """Fetch all enabled scraping sources from the database."""
     async with async_session() as session:
         result = await session.execute(
-            select(ScrapingSource).where(ScrapingSource.enabled == True)  # noqa: E712
+            select(ScrapingSource).where(ScrapingSource.enabled.is_(True))
         )
         return list(result.scalars().all())
 

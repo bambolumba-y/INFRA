@@ -60,6 +60,7 @@ async def require_tma_auth(
     In development mode with no bot token, auth is bypassed.
     """
     if settings.app_env == "development" and not settings.telegram_bot_token:
+        logger.warning("TMA auth bypassed — development mode with no bot token")
         return {"id": 1, "first_name": "Dev"}
 
     if not x_telegram_init_data:

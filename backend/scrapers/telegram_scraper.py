@@ -60,39 +60,37 @@ class TelegramScraper:
             logger.exception("Failed to join channel %s", channel)
             return False
 
+    async def _iter_posts(
+        self, channel: str, limit: int
+    ) -> list[TelegramPost]:
+        """Iterate messages from a channel and return TelegramPost list."""
+        client = await self._get_client()
+        posts: list[TelegramPost] = []
+        async for message in client.iter_messages(channel, limit=limit):
+            if not isinstance(message, Message) or not message.text:
+                continue
+            post = TelegramPost(
+                channel=channel,
+                text=message.text,
+                message_id=message.id,
+                date=message.date.isoformat() if message.date else "",
+            )
+            posts.append(post)
+        return posts
+
     async def scrape_channel(
         self, channel: str, limit: int = 50
     ) -> list[TelegramPost]:
         """Fetch the latest *limit* messages from a public channel."""
-        client = await self._get_client()
-        posts: list[TelegramPost] = []
-
         try:
-            async for message in client.iter_messages(channel, limit=limit):
-                if not isinstance(message, Message) or not message.text:
-                    continue
-
-                post = TelegramPost(
-                    channel=channel,
-                    text=message.text,
-                    message_id=message.id,
-                    date=message.date.isoformat() if message.date else "",
-                )
-                posts.append(post)
+            posts = await self._iter_posts(channel, limit)
         except Exception:
             logger.warning("Cannot read %s, attempting to join...", channel)
             joined = await self.join_channel(channel)
             if joined:
-                async for message in client.iter_messages(channel, limit=limit):
-                    if not isinstance(message, Message) or not message.text:
-                        continue
-                    post = TelegramPost(
-                        channel=channel,
-                        text=message.text,
-                        message_id=message.id,
-                        date=message.date.isoformat() if message.date else "",
-                    )
-                    posts.append(post)
+                posts = await self._iter_posts(channel, limit)
+            else:
+                posts = []
 
         logger.info("Scraped %d messages from %s", len(posts), channel)
         return posts
