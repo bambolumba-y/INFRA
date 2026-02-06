@@ -180,7 +180,12 @@ def _get_fernet() -> Fernet:
         raise HTTPException(
             status_code=500, detail="Encryption key not configured"
         )
-    return Fernet(key.encode())
+    try:
+        return Fernet(key.encode())
+    except (ValueError, Exception) as exc:
+        raise HTTPException(
+            status_code=500, detail="Invalid encryption key format"
+        ) from exc
 
 
 def _encrypt_value(value: str) -> str:

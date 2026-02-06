@@ -19,7 +19,9 @@ let _initDataRaw: string | undefined;
  * outgoing request.
  */
 export function setInitDataRaw(raw: string | undefined) {
-  _initDataRaw = raw;
+  if (raw) {
+    _initDataRaw = raw;
+  }
 }
 
 api.interceptors.request.use((config) => {

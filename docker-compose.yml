@@ -24,10 +24,11 @@ services:
     environment:
       ANONYMIZED_TELEMETRY: "false"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat'); print('ok')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
     build:
@@ -51,10 +52,11 @@ services:
       vector-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health'); print('ok')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     restart: unless-stopped
 
   frontend:

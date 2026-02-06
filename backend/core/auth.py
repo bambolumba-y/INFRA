@@ -42,6 +42,8 @@ def validate_init_data(
     except (ValueError, TypeError) as exc:
         raise ValueError("Invalid auth_date in initData") from exc
     age = int(time.time()) - auth_date
+    if age < 0:
+        raise ValueError("initData auth_date is in the future")
     if age > max_age:
         raise ValueError("initData is too old (replay protection)")
 
