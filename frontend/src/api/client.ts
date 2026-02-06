@@ -8,6 +8,28 @@ export const api = axios.create({
 });
 
 /* ------------------------------------------------------------------ */
+/*  Telegram initData interceptor                                      */
+/* ------------------------------------------------------------------ */
+
+let _initDataRaw: string | undefined;
+
+/**
+ * Called once during Telegram SDK initialisation to cache the raw
+ * initData string so the Axios interceptor can attach it to every
+ * outgoing request.
+ */
+export function setInitDataRaw(raw: string | undefined) {
+  _initDataRaw = raw;
+}
+
+api.interceptors.request.use((config) => {
+  if (_initDataRaw) {
+    config.headers["X-Telegram-Init-Data"] = _initDataRaw;
+  }
+  return config;
+});
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 

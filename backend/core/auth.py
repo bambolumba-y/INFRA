@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 from urllib.parse import parse_qs, unquote
 
 from fastapi import Header, HTTPException
@@ -14,8 +15,13 @@ from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Maximum age (in seconds) for auth_date before the payload is considered stale.
+MAX_AUTH_AGE_SECONDS = 600  # 10 minutes
 
-def validate_init_data(init_data: str, bot_token: str) -> dict:
+
+def validate_init_data(
+    init_data: str, bot_token: str, *, max_age: int = MAX_AUTH_AGE_SECONDS
+) -> dict:
     """Validate Telegram WebApp initData and return parsed user data.
 
     Reference: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
@@ -26,6 +32,18 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
     received_hash = parsed.pop("hash", [None])[0]
     if not received_hash:
         raise ValueError("Missing hash in initData")
+
+    # Validate auth_date presence and freshness (replay protection)
+    auth_date_raw = parsed.get("auth_date", [None])[0]
+    if not auth_date_raw:
+        raise ValueError("Missing auth_date in initData")
+    try:
+        auth_date = int(auth_date_raw)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Invalid auth_date in initData") from exc
+    age = int(time.time()) - auth_date
+    if age > max_age:
+        raise ValueError("initData is too old (replay protection)")
 
     # Build the data-check-string: sort key=value pairs alphabetically
     data_pairs = []

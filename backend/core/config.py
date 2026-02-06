@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Admin
     admin_ids: list[int] = []  # Telegram user IDs allowed to access /admin
 
+    # Encryption key for storing sensitive data (Fernet key, base64-encoded)
+    encryption_key: str = ""
+
     # Telegram
     telegram_bot_token: str = ""
     telegram_api_id: int = 0

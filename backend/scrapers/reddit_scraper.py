@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -10,6 +11,9 @@ import asyncpraw  # type: ignore[import-untyped]
 from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Timeout (seconds) for scraping a single subreddit
+SUBREDDIT_TIMEOUT_SECONDS = 60
 
 
 @dataclass
@@ -50,14 +54,14 @@ class RedditScraper:
             )
         return self._reddit
 
-    async def scrape_subreddit(
-        self, subreddit_name: str, limit: int = 25
-    ) -> list[RedditPost]:
-        """Fetch the latest *limit* hot posts from a subreddit."""
-        reddit = await self._get_reddit()
-        subreddit = await reddit.subreddit(subreddit_name)
-
-        posts: list[RedditPost] = []
+    async def _collect_posts(
+        self,
+        subreddit: asyncpraw.reddit.Subreddit,
+        subreddit_name: str,
+        limit: int,
+        posts: list[RedditPost],
+    ) -> None:
+        """Collect posts from a subreddit into the provided list."""
         async for submission in subreddit.hot(limit=limit):
             post = RedditPost(
                 subreddit=subreddit_name,
@@ -70,6 +74,25 @@ class RedditScraper:
                 permalink=f"https://reddit.com{submission.permalink}",
             )
             posts.append(post)
+
+    async def scrape_subreddit(
+        self, subreddit_name: str, limit: int = 25
+    ) -> list[RedditPost]:
+        """Fetch the latest *limit* hot posts from a subreddit with timeout."""
+        reddit = await self._get_reddit()
+        subreddit = await reddit.subreddit(subreddit_name)
+
+        posts: list[RedditPost] = []
+        try:
+            await asyncio.wait_for(
+                self._collect_posts(subreddit, subreddit_name, limit, posts),
+                timeout=SUBREDDIT_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Timeout scraping r/%s after %ds — returning %d posts collected so far",
+                subreddit_name, SUBREDDIT_TIMEOUT_SECONDS, len(posts),
+            )
 
         logger.info("Scraped %d posts from r/%s", len(posts), subreddit_name)
         return posts

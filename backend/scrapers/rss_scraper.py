@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from functools import partial
 
 import feedparser  # type: ignore[import-untyped]
 
@@ -14,6 +15,9 @@ DEFAULT_FEEDS = [
     "https://hnrss.org/newest?points=50",
     "https://feeds.feedburner.com/TechCrunch/",
 ]
+
+# Timeout (seconds) for fetching a single feed
+FEED_TIMEOUT_SECONDS = 30
 
 
 @dataclass
@@ -34,9 +38,16 @@ class RSSScraper:
         self.feed_urls = feed_urls or DEFAULT_FEEDS
 
     async def _parse_feed(self, url: str) -> list[RSSItem]:
-        """Parse a single feed URL in a thread-pool (feedparser is sync)."""
+        """Parse a single feed URL in a thread-pool (feedparser is sync) with timeout."""
         loop = asyncio.get_running_loop()
-        feed = await loop.run_in_executor(None, feedparser.parse, url)
+        try:
+            feed = await asyncio.wait_for(
+                loop.run_in_executor(None, partial(feedparser.parse, url)),
+                timeout=FEED_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout fetching feed %s after %ds", url, FEED_TIMEOUT_SECONDS)
+            return []
 
         items: list[RSSItem] = []
         for entry in feed.entries:

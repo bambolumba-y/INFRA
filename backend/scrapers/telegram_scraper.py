@@ -8,12 +8,17 @@ import random
 from dataclasses import dataclass, field
 
 from telethon import TelegramClient, functions
+from telethon.errors import FloodWaitError
 from telethon.sessions import StringSession
 from telethon.tl.types import Message
 
 from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Retry budget for FloodWait / transient errors
+MAX_RETRIES = 3
+BASE_BACKOFF_SECONDS = 5
 
 
 @dataclass
@@ -58,6 +63,10 @@ class TelegramScraper:
             await client(functions.channels.JoinChannelRequest(entity))
             logger.info("Joined channel %s", channel)
             return True
+        except FloodWaitError as e:
+            logger.warning("FloodWait while joining %s — waiting %ds", channel, e.seconds)
+            await asyncio.sleep(e.seconds)
+            return False
         except Exception:
             logger.exception("Failed to join channel %s", channel)
             return False
@@ -83,19 +92,38 @@ class TelegramScraper:
     async def scrape_channel(
         self, channel: str, limit: int = 50
     ) -> list[TelegramPost]:
-        """Fetch the latest *limit* messages from a public channel."""
-        try:
-            posts = await self._iter_posts(channel, limit)
-        except Exception:
-            logger.warning("Cannot read %s, attempting to join...", channel)
-            joined = await self.join_channel(channel)
-            if joined:
-                posts = await self._iter_posts(channel, limit)
-            else:
-                posts = []
+        """Fetch the latest *limit* messages from a public channel.
 
-        logger.info("Scraped %d messages from %s", len(posts), channel)
-        return posts
+        Handles FloodWaitError with exponential backoff.
+        """
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                posts = await self._iter_posts(channel, limit)
+                logger.info("Scraped %d messages from %s", len(posts), channel)
+                return posts
+            except FloodWaitError as e:
+                wait = e.seconds + 1
+                logger.warning(
+                    "FloodWait on %s — waiting %ds (attempt %d/%d)",
+                    channel, wait, attempt + 1, MAX_RETRIES + 1,
+                )
+                await asyncio.sleep(wait)
+            except Exception:
+                if attempt == 0:
+                    logger.warning("Cannot read %s, attempting to join...", channel)
+                    joined = await self.join_channel(channel)
+                    if not joined:
+                        return []
+                else:
+                    backoff = BASE_BACKOFF_SECONDS * (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(
+                        "Retry %d/%d for %s — backoff %.1fs",
+                        attempt + 1, MAX_RETRIES + 1, channel, backoff,
+                    )
+                    await asyncio.sleep(backoff)
+
+        logger.error("Exhausted retries for channel %s", channel)
+        return []
 
     async def scrape_all_channels(
         self, limit_per_channel: int = 50

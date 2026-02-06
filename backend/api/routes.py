@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 
+from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.auth import require_tma_auth
+from backend.core.config import settings
 from backend.core.database import get_session
 from backend.models.schemas import Content, Job, User, UserResume
 from backend.services.career_service import (
@@ -169,27 +173,43 @@ class APIKeysPayload(BaseModel):
     anthropic_api_key: str | None = None
 
 
+def _get_fernet() -> Fernet:
+    """Return a Fernet instance from the configured encryption key."""
+    key = settings.encryption_key
+    if not key:
+        raise HTTPException(
+            status_code=500, detail="Encryption key not configured"
+        )
+    return Fernet(key.encode())
+
+
+def _encrypt_value(value: str) -> str:
+    """Encrypt a string value using Fernet symmetric encryption."""
+    return _get_fernet().encrypt(value.encode()).decode()
+
+
 @router.post("/settings/keys")
 async def save_api_keys(
     payload: APIKeysPayload,
-    user_id: int = 1,
+    user: dict = Depends(require_tma_auth),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Store user-provided API keys in their preferences."""
+    """Store user-provided API keys in their preferences (encrypted)."""
+    user_id = user.get("id", 1)
     result = await session.execute(select(User).where(User.tg_id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        user = User(tg_id=user_id, preferences={})
-        session.add(user)
+    db_user = result.scalar_one_or_none()
+    if db_user is None:
+        db_user = User(tg_id=user_id, preferences={})
+        session.add(db_user)
 
-    prefs = user.preferences or {}
+    prefs = db_user.preferences or {}
     if payload.groq_api_key is not None:
-        prefs["groq_api_key"] = payload.groq_api_key
+        prefs["groq_api_key"] = _encrypt_value(payload.groq_api_key)
     if payload.openai_api_key is not None:
-        prefs["openai_api_key"] = payload.openai_api_key
+        prefs["openai_api_key"] = _encrypt_value(payload.openai_api_key)
     if payload.anthropic_api_key is not None:
-        prefs["anthropic_api_key"] = payload.anthropic_api_key
-    user.preferences = prefs
+        prefs["anthropic_api_key"] = _encrypt_value(payload.anthropic_api_key)
+    db_user.preferences = prefs
 
     await session.commit()
     return {"status": "saved"}

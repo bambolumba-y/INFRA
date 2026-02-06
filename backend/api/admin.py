@@ -19,8 +19,13 @@ admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 async def require_admin(user: dict = Depends(require_tma_auth)) -> dict:
-    """Verify authenticated user is in the ADMIN_IDS list."""
-    if settings.admin_ids and user.get("id") not in settings.admin_ids:
+    """Verify authenticated user is in the ADMIN_IDS list.
+
+    Fail-closed: if ADMIN_IDS is empty, no one gets admin access.
+    """
+    if not settings.admin_ids:
+        raise HTTPException(status_code=403, detail="Admin access denied — no admins configured")
+    if user.get("id") not in settings.admin_ids:
         raise HTTPException(status_code=403, detail="Admin access denied")
     return user
 

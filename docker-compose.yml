@@ -16,25 +16,32 @@ services:
       retries: 5
 
   vector-db:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.23
     ports:
       - "8100:8000"
     volumes:
       - chromadata:/chroma/chroma
     environment:
       ANONYMIZED_TELEMETRY: "false"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
     command: >
       sh -c "cd /app && python -m alembic upgrade head &&
-             uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2"
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
       DATABASE_URL: postgresql+asyncpg://infra:infra@db:5432/infra
       CHROMA_HOST: vector-db
       CHROMA_PORT: 8000
@@ -42,15 +49,28 @@ services:
       db:
         condition: service_healthy
       vector-db:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
     ports:
-      - "5173:5173"
+      - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   pgdata:
