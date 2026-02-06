@@ -23,6 +23,18 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    telegram_api_id: int = 0
+    telegram_api_hash: str = ""
+    telegram_channels: str = ""  # comma-separated list of channels
+
+    # Reddit
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
+    reddit_user_agent: str = "INFRA/0.1 (intelligence terminal)"
+    reddit_subreddits: str = "programming,cscareerquestions,localllama"
+
+    # ChromaDB
+    chroma_persist_dir: str = "./chroma_data"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
