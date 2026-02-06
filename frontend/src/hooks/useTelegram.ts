@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
+import { setInitDataRaw } from "@/api/client";
 
 /**
  * Initialise the Telegram Web App SDK and expose basic helpers.
@@ -19,6 +20,12 @@ export function useTelegram() {
         if (!sdk.isTMA()) return;
 
         sdk.init();
+
+        // Attach raw initData to every outgoing API request
+        const rawData = sdk.initDataRaw();
+        if (rawData) {
+          setInitDataRaw(rawData);
+        }
 
         // initDataUser is a Computed<User | undefined> signal
         const user = sdk.initDataUser();

@@ -123,18 +123,30 @@ def test_scraping_source_model() -> None:
 @pytest.mark.asyncio
 async def test_admin_health_endpoint() -> None:
     """GET /api/admin/health returns scheduler status."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/admin/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert "scheduler_running" in data
-    assert "jobs" in data
+    from backend.api.admin import require_admin
+    from backend.core.auth import require_tma_auth
+
+    async def override_admin():
+        return {"id": 42, "first_name": "Admin"}
+
+    app.dependency_overrides[require_admin] = override_admin
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/admin/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "scheduler_running" in data
+        assert "jobs" in data
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
 async def test_admin_sources_list() -> None:
     """GET /api/admin/sources returns a list."""
+    from backend.api.admin import require_admin
+
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []
 
@@ -144,9 +156,13 @@ async def test_admin_sources_list() -> None:
     async def override_session():
         yield mock_session
 
+    async def override_admin():
+        return {"id": 42, "first_name": "Admin"}
+
     from backend.core.database import get_session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[require_admin] = override_admin
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -160,14 +176,20 @@ async def test_admin_sources_list() -> None:
 @pytest.mark.asyncio
 async def test_admin_create_source_invalid_type() -> None:
     """POST /api/admin/sources rejects invalid source_type."""
+    from backend.api.admin import require_admin
+
     mock_session = AsyncMock()
 
     async def override_session():
         yield mock_session
 
+    async def override_admin():
+        return {"id": 42, "first_name": "Admin"}
+
     from backend.core.database import get_session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[require_admin] = override_admin
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

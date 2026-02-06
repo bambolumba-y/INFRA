@@ -39,12 +39,15 @@ async def test_require_admin_rejects_unlisted_user() -> None:
 
 
 @pytest.mark.asyncio
-async def test_require_admin_allows_all_when_empty() -> None:
-    """require_admin allows access when ADMIN_IDS is empty (no restriction)."""
+async def test_require_admin_rejects_when_empty() -> None:
+    """require_admin denies access when ADMIN_IDS is empty (fail-closed)."""
+    from fastapi import HTTPException
+
     with patch("backend.api.admin.settings") as mock_settings:
         mock_settings.admin_ids = []
-        result = await require_admin(user={"id": 1, "first_name": "Anyone"})
-        assert result["id"] == 1
+        with pytest.raises(HTTPException) as exc_info:
+            await require_admin(user={"id": 1, "first_name": "Anyone"})
+        assert exc_info.value.status_code == 403
 
 
 @pytest.mark.asyncio
